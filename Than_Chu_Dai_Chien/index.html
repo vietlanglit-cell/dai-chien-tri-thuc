@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cổng Game Thần Chú</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            margin: 0;
+        }
+        h1 { margin-bottom: 40px; text-shadow: 0 2px 5px rgba(0,0,0,0.5); font-size: 2.5em; text-align: center;}
+        .container { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+        
+        a { text-decoration: none; }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.2);
+            text-align: center;
+            width: 200px;
+            transition: transform 0.2s, background 0.2s;
+            cursor: pointer;
+            color: white;
+        }
+
+        .card:hover { transform: translateY(-10px); background: rgba(255, 255, 255, 0.2); }
+        
+        .icon { font-size: 50px; display: block; margin-bottom: 10px; }
+        .title { font-size: 24px; font-weight: bold; display: block; }
+        .desc { font-size: 14px; opacity: 0.8; margin-top: 5px; display: block; }
+
+        /* Nút giáo viên màu vàng */
+        #teacher-card { border-bottom: 5px solid #f1c40f; }
+        /* Nút học sinh màu xanh */
+        #student-card { border-bottom: 5px solid #2ecc71; }
+
+    </style>
+</head>
+<body>
+
+    <h1>THẦN CHÚ ĐẠI CHIẾN 🧙‍♂️</h1>
+
+    <div class="container">
+        <a href="giao_vien.html">
+            <div class="card" id="teacher-card">
+                <span class="icon">🖥️</span>
+                <span class="title">Giáo Viên</span>
+                <span class="desc">Màn hình máy chiếu</span>
+            </div>
+        </a>
+
+        <a href="hoc_sinh.html">
+            <div class="card" id="student-card">
+                <span class="icon">📱</span>
+                <span class="title">Học Sinh</span>
+                <span class="desc">Tay cầm điều khiển</span>
+            </div>
+        </a>
+    </div>
+
+</body>
+</html>

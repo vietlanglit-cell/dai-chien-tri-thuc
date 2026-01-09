@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Đấu Trường Phù Thủy (Máy Chủ)</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #222; color: white; overflow: hidden; margin: 0; }
+        
+        /* Giao diện cài đặt */
+        #setup { position: absolute; top: 10px; left: 10px; z-index: 100; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px; }
+        input { padding: 5px; font-size: 16px; }
+        
+        /* Mã phòng to rõ */
+        #roomIDDisplay { position: absolute; bottom: 10px; width: 100%; text-align: center; font-size: 24px; color: cyan; }
+
+        /* Sân đấu */
+        .arena { display: flex; justify-content: space-between; align-items: center; height: 100vh; padding: 0 50px; }
+        
+        .wizard { text-align: center; position: relative; width: 250px; }
+        .wizard img { width: 100%; height: auto; filter: drop-shadow(0 0 10px rgba(255,255,255,0.5)); transition: transform 0.1s; }
+        
+        /* Thanh máu */
+        .health-bar { width: 100%; height: 30px; background: #555; border: 2px solid #fff; margin-bottom: 10px; border-radius: 5px; overflow: hidden; }
+        .health-fill { height: 100%; width: 100%; transition: width 0.5s ease-out; }
+        #hpA { background: #e74c3c; } /* Đỏ */
+        #hpB { background: #3498db; } /* Xanh */
+
+        /* Hiệu ứng chưởng */
+        .spell {
+            position: absolute; width: 60px; height: 60px; border-radius: 50%; display: none; top: 50%; z-index: 50;
+        }
+        #spellA { background: radial-gradient(circle, yellow, red); box-shadow: 0 0 20px orange; left: 200px; }
+        #spellB { background: radial-gradient(circle, white, blue); box-shadow: 0 0 20px cyan; right: 200px; }
+
+    </style>
+</head>
+<body>
+
+    <div id="setup">
+        <label>Đáp án đúng hiện tại:</label>
+        <input type="text" id="correctAnswer" value="con mèo">
+        <button onclick="alert('Đã cập nhật đáp án!')">Lưu</button>
+        <br>
+        <small>Trạng thái: <span id="status">Đang tạo mã phòng...</span></small>
+    </div>
+
+    <div class="arena">
+        <div class="wizard" id="teamA">
+            <h1 style="color: #e74c3c;">ĐỘI ĐỎ (A)</h1>
+            <div class="health-bar"><div class="health-fill" id="hpFillA"></div></div>
+            <img src="https://cdn-icons-png.flaticon.com/512/3306/3306634.png" alt="Wizard A">
+            <div class="spell" id="spellA"></div>
+        </div>
+
+        <div style="text-align: center;">
+            <h1 style="font-size: 80px; text-shadow: 0 0 20px yellow;">VS</h1>
+        </div>
+
+        <div class="wizard" id="teamB">
+            <h1 style="color: #3498db;">ĐỘI XANH (B)</h1>
+            <div class="health-bar"><div class="health-fill" id="hpFillB"></div></div>
+            <img src="https://cdn-icons-png.flaticon.com/512/3306/3306652.png" alt="Wizard B">
+            <div class="spell" id="spellB"></div>
+        </div>
+    </div>
+
+    <div id="roomIDDisplay">MÃ PHÒNG: <span id="myId" style="font-weight: bold; font-size: 40px;">...</span></div>
+
+    <script>
+        // === 1. KẾT NỐI MẠNG (PEERJS) ===
+        // Tạo ID ngẫu nhiên ngắn gọn (3 chữ số) cho dễ nhập
+        const peer = new Peer(Math.floor(1000 + Math.random() * 9000).toString(), {
+			debug: 2,
+			config: {
+				'iceServers': [
+					{ url: 'stun:stun.l.google.com:19302' },
+					{ url: 'stun:stun1.l.google.com:19302' },
+					// Thêm TURN Server để xuyên tường lửa
+					{
+						urls: "turn:openrelay.metered.ca:80",
+						username: "openrelayproject",
+						credential: "openrelayproject"
+					},
+					{
+						urls: "turn:openrelay.metered.ca:443",
+						username: "openrelayproject",
+						credential: "openrelayproject"
+					},
+					{
+						urls: "turn:openrelay.metered.ca:443?transport=tcp",
+						username: "openrelayproject",
+						credential: "openrelayproject"
+					}
+				]
+			}
+		});
+
+        peer.on('open', function(id) {
+            document.getElementById('myId').innerText = id;
+            document.getElementById('status').innerText = "Sẵn sàng kết nối!";
+        });
+
+        peer.on('connection', function(conn) {
+            conn.on('data', function(data) {
+                // Nhận dữ liệu từ điện thoại học sinh
+                xuLyDapAn(data.doi, data.loi_noi);
+            });
+        });
+
+        // === 2. LOGIC GAME ===
+        let mauA = 100;
+        let mauB = 100;
+
+        function xuLyDapAn(doi, loiNoi) {
+            const dapAnDung = document.getElementById('correctAnswer').value.toLowerCase();
+            console.log(`Đội ${doi} nói: ${loiNoi}`);
+
+            // Kiểm tra xem lời nói có chứa đáp án không
+            if (loiNoi.toLowerCase().includes(dapAnDung)) {
+                tanCong(doi);
+            }
+        }
+
+        function tanCong(doiTanCong) {
+            // Rung màn hình người bị đánh
+            const mucTieu = doiTanCong === 'A' ? 'teamB' : 'teamA';
+            const spell = doiTanCong === 'A' ? document.getElementById('spellA') : document.getElementById('spellB');
+            
+            // 1. Hiện chưởng
+            spell.style.display = 'block';
+            spell.style.transition = 'transform 0.5s ease-in';
+            
+            // 2. Bay chưởng
+            const huongBay = doiTanCong === 'A' ? '50vw' : '-50vw'; // Bay sang phải hoặc trái
+            setTimeout(() => {
+                spell.style.transform = `translateX(${huongBay})`;
+            }, 50);
+
+            // 3. Trúng đích sau 0.5s
+            setTimeout(() => {
+                spell.style.display = 'none';
+                spell.style.transform = 'none'; // Reset vị trí
+
+                // Trừ máu
+                if (doiTanCong === 'A') {
+                    mauB -= 20;
+                    document.getElementById('hpFillB').style.width = mauB + '%';
+                    rungManHinh('teamB');
+                } else {
+                    mauA -= 20;
+                    document.getElementById('hpFillA').style.width = mauA + '%';
+                    rungManHinh('teamA');
+                }
+                checkWin();
+
+            }, 550);
+        }
+
+        function rungManHinh(elementId) {
+            const el = document.getElementById(elementId);
+            el.style.transform = 'translate(10px, 0)';
+            setTimeout(() => el.style.transform = 'translate(-10px, 0)', 100);
+            setTimeout(() => el.style.transform = 'translate(10px, 0)', 200);
+            setTimeout(() => el.style.transform = 'none', 300);
+        }
+
+        function checkWin() {
+            if (mauA <= 0) alert("ĐỘI XANH THẮNG!");
+            if (mauB <= 0) alert("ĐỘI ĐỎ THẮNG!");
+        }
+    </script>
+</body>
+</html>

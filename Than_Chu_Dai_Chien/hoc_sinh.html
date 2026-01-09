@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tay Cầm Thần Chú</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f0f0f0; }
+        input, select, button { width: 100%; padding: 15px; margin-bottom: 15px; font-size: 18px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box;}
+        
+        button { cursor: pointer; color: white; border: none; font-weight: bold; }
+        .btn-connect { background: #333; }
+        .btn-record { background: purple; font-size: 24px; height: 150px; border-radius: 50%; width: 150px; margin: 0 auto; display: block; box-shadow: 0 4px 10px rgba(0,0,0,0.3);}
+        
+        /* Hiệu ứng khi đang ghi âm */
+        .listening { animation: pulse 1.5s infinite; background: red; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+        #gameUI { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="loginUI">
+        <h2>Nhập Mã Phòng (trên bảng)</h2>
+        <input type="text" id="roomID" placeholder="Ví dụ: 1234">
+        
+        <h3>Chọn Đội</h3>
+        <select id="teamSelect">
+            <option value="A">🔴 Đội Đỏ (A)</option>
+            <option value="B">🔵 Đội Xanh (B)</option>
+        </select>
+        
+        <button class="btn-connect" onclick="ketNoi()">VÀO TRẬN ĐẤU</button>
+        <p id="statusLog" style="color: gray;">Chưa kết nối</p>
+    </div>
+
+    <div id="gameUI">
+        <h2 id="teamLabel"></h2>
+        <p>Giữ nút bên dưới và HÉT to đáp án!</p>
+        
+        <button id="micBtn" class="btn-record">🎙️</button>
+        
+        <p id="resultText" style="font-size: 20px; margin-top: 20px; color: #333;">...</p>
+    </div>
+
+    <script>
+        var peer = new Peer(null, {
+			debug: 2,
+			config: {
+				'iceServers': [
+					{ url: 'stun:stun.l.google.com:19302' },
+					{ url: 'stun:stun1.l.google.com:19302' },
+					// Thêm TURN Server để xuyên tường lửa
+					{
+						urls: "turn:openrelay.metered.ca:80",
+						username: "openrelayproject",
+						credential: "openrelayproject"
+					},
+					{
+						urls: "turn:openrelay.metered.ca:443",
+						username: "openrelayproject",
+						credential: "openrelayproject"
+					},
+					{
+						urls: "turn:openrelay.metered.ca:443?transport=tcp",
+						username: "openrelayproject",
+						credential: "openrelayproject"
+					}
+				]
+			}
+		});
+		
+        var conn = null;
+
+        // === 1. KẾT NỐI VỚI MÁY GIÁO VIÊN ===
+        function ketNoi() {
+            var roomID = document.getElementById('roomID').value;
+            var team = document.getElementById('teamSelect').value;
+
+            document.getElementById('statusLog').innerText = "Đang kết nối tới phòng " + roomID + "...";
+
+            // Kết nối tới ID của giáo viên
+            conn = peer.connect(roomID);
+
+            conn.on('open', function() {
+                // Khi kết nối thành công
+                document.getElementById('loginUI').style.display = 'none';
+                document.getElementById('gameUI').style.display = 'block';
+                
+                var label = document.getElementById('teamLabel');
+                label.innerText = (team === 'A') ? "BẠN LÀ ĐỘI ĐỎ" : "BẠN LÀ ĐỘI XANH";
+                label.style.color = (team === 'A') ? "red" : "blue";
+            });
+            
+            conn.on('error', function(err){
+                 alert("Không tìm thấy phòng! Hãy kiểm tra lại mã.");
+            });
+        }
+
+        // === 2. XỬ LÝ GIỌNG NÓI (Web Speech API) ===
+        var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            alert("Trình duyệt này không hỗ trợ giọng nói. Hãy dùng Chrome trên Android hoặc Safari trên iOS.");
+        } else {
+            var recognition = new SpeechRecognition();
+            recognition.lang = 'vi-VN';
+            recognition.continuous = false;
+            
+            var micBtn = document.getElementById('micBtn');
+            var resultText = document.getElementById('resultText');
+
+            // Xử lý giữ nút để nói (Desktop/Android) hoặc bấm để nói
+            micBtn.onmousedown = startListen;
+            micBtn.ontouchstart = startListen; // Cho màn hình cảm ứng
+            
+            micBtn.onmouseup = stopListen;
+            micBtn.ontouchend = stopListen;
+
+            function startListen() {
+                try { recognition.start(); } catch(e) {}
+                micBtn.classList.add("listening");
+                resultText.innerText = "Đang nghe...";
+            }
+
+            function stopListen() {
+                micBtn.classList.remove("listening");
+                // recognition.stop() sẽ tự kích hoạt sự kiện onresult bên dưới
+            }
+
+            recognition.onresult = function(event) {
+                var text = event.results[0][0].transcript;
+                resultText.innerText = "Bạn nói: " + text;
+                
+                // Gửi đáp án về cho giáo viên
+                if (conn && conn.open) {
+                    conn.send({
+                        doi: document.getElementById('teamSelect').value,
+                        loi_noi: text
+                    });
+                }
+            };
+
+            recognition.onspeechend = function() {
+                recognition.stop();
+                micBtn.classList.remove("listening");
+            }
+        }
+    </script>
+</body>
+</html>
